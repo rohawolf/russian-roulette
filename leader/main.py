@@ -1,14 +1,15 @@
-import os
+import os, sys
+
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query, Response
 
-from db import db_setting
+from db import get_conn, db_setting
 
 # ---------------------------
 # 설정
 # ---------------------------
 WAL_FILE = "sqlite.db-wal"
 MAX_BYTES_DEFAULT = 256 * 1024  # 256 KB per request
-print(f"DB status: {db_setting()}")
 
 # ---------------------------
 # Helper 함수
@@ -37,7 +38,28 @@ def read_wal_chunk(offset: int, max_bytes: int):
 # ---------------------------
 # WAL API
 # ---------------------------
-app = FastAPI(title="Russian Roulette - Leader WAL API")
+
+def start():
+    print("service is started.")
+    db_setting(get_conn())
+    for a in os.walk(os.getcwd()):
+        print(a)
+
+def shutdown():
+    pass
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # When service starts.
+    start()
+    yield
+    # When service is stopped.
+    shutdown()
+
+app = FastAPI(
+    title="Russian Roulette - Leader WAL API",
+    lifespan=lifespan
+)
 
 @app.get("/internal/wal")
 def wal_endpoint(offset: int = Query(..., ge=0), max_bytes: int = Query(MAX_BYTES_DEFAULT, gt=0)):

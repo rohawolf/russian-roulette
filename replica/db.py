@@ -3,15 +3,23 @@ import sqlite3
 
 DB_FILE = "sqlite.db"
 
-def db_setting():
+def get_conn():
     if not os.path.exists(DB_FILE):
         conn = sqlite3.connect(DB_FILE)
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.close()
-    
-    conn = sqlite3.connect(f'file:{DB_FILE}?mode=ro', uri=True)
-    cursor_ = conn.cursor()
+    else:
+        conn = sqlite3.connect(f'file:{DB_FILE}?mode=ro', uri=True)
+    return conn
 
-    cursor_.execute("PRAGMA integrity_check;")
-    return cursor_.fetchone()
 
+def db_setting(conn):
+    conn.execute("PRAGMA journal_mode=WAL;")
+
+
+def select_(conn):
+    conn.execute("""
+        SELECT
+            *
+        FROM
+            test
+        ;
+    """)

@@ -1,8 +1,9 @@
-import os
+import logging
+import os, sys
 import time
 import requests
 
-from db import db_setting
+from db import get_conn, db_setting
 
 # ---------------------------
 # 설정
@@ -17,6 +18,10 @@ OFFSET_FILE = "wal_offset.meta"                  # 로컬 offset 저장
 POLL_INTERVAL = 2.0                              # polling 주기 (초)
 MAX_BYTES = 256 * 1024                           # 한 번에 가져올 최대 WAL bytes
 
+logging.root.handlers = []
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler(sys.stdout))
+logger.setLevel(logging.DEBUG)
 
 # ---------------------------
 # offset 관리
@@ -45,6 +50,7 @@ def pull_wal(last_offset):
             params={"offset": last_offset, "max_bytes": MAX_BYTES},
             timeout=5
         )
+        logger.info(f"[INFO] requesting to {LEADER_URL}.. offset: {last_offset}")
         if resp.status_code == 204:
             # 최신 상태
             return None, last_offset
@@ -53,7 +59,8 @@ def pull_wal(last_offset):
         end_offset = int(resp.headers.get("X-WAL-End-Offset", last_offset + len(chunk)))
         return chunk, end_offset
     except requests.RequestException as e:
-        print(f"[WARN] WAL pull failed: {e}")
+        logger.warning("[WARN] WAL pull failed: ")
+        logger.warning(e)
         return None, last_offset
 
 # ---------------------------
@@ -71,17 +78,20 @@ def append_wal(chunk):
 # ---------------------------
 
 def work():
-    print(f"[INFO] DB status: {db_setting()}")
-    print("[INFO] Starting Replica WAL Pull Worker")
+    db_setting(get_conn())
+    
+    logger.info("[INFO] Starting Replica WAL Pull Worker")
     last_offset = load_offset()
-    print(f"[INFO] Starting from offset {last_offset}")
+    logger.info(f"[INFO] Starting from offset {last_offset}")
 
     while True:
         chunk, new_offset = pull_wal(last_offset)
+        
         if chunk:
             append_wal(chunk)
             save_offset(new_offset)
-            print(f"[INFO] Pulled {len(chunk)} bytes, offset updated to {new_offset}")
+            logger.info(f"[INFO] Pulled {len(chunk)} bytes, offset updated to {new_offset}")
+            last_offset = new_offset
         else:
             # 최신 상태이거나 실패 시 sleep
             time.sleep(POLL_INTERVAL)

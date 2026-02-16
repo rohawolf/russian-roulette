@@ -107,8 +107,51 @@ ex) **response (success)**
 #### `POST /raft/request_vote`
 cadidate node가 다른 각 node로 선거 시작 요청
 
+ex) **request**
+```json
+{
+  "term": 4,
+  "candidate_id": "node-b",
+  "wal_offset": 8192
+}
+```
+ex) **response (success)**
+```json
+{
+  "term": 4,
+  "vote_granted": true
+}
+```
+##### vote 승인 규칙
+follower node는 아래 조건을 만족할 때만 선거를 허용
+
+1. term >= local.current_term
+
+2. local.voted_for is None or local.voted_for == candidate_id
+
+3. wal_offset >= local.wal_offset
+
 #### `GET /raft/state`
 상태 확인 용 (디버깅 목적)
 
+ex) **response (success)**
+```json
+{
+  "node_id": "node-b",
+  "role": "leader",
+  "term": 4,
+  "leader_id": "node-b",
+  "wal_offset": 8192
+}
+```
+
 #### `GET /raft/leader`
 nginx 연동 용
+
+ex) **response (success)**
+```json
+{
+  "term": 4,
+  "leader_id": "node-b"
+}
+```
